@@ -175,6 +175,42 @@
       "</article>";
   }
 
+  // ---------- aula guiada ----------
+  var LICOES_LANG_LAB = { jp: "Japonês", zh: "Chinês", en: "Inglês", es: "Espanhol" };
+  function lexCard(lang, L) {
+    return '<article class="lex ' + lang + '">' +
+      '<h3>' + esc(LICOES_LANG_LAB[lang]) + '<span>' + esc(L.titulo) + "</span></h3>" +
+      '<p class="lex-exp">' + esc(L.explicacao) + "</p>" +
+      '<ul class="lex-ex">' + L.exemplos.map(function (ex) {
+        return '<li><button class="lex-say" data-say="' + esc(ex[0]) + '" data-lang="' + lang + '"><span class="lex-t" lang="' + (lang === "jp" ? "ja" : lang === "zh" ? "zh-CN" : "en") + '">' + esc(ex[0]) + "</span>" +
+          (ex[1] ? '<span class="lex-r">' + esc(ex[1]) + "</span>" : "") +
+          (ex[2] ? '<span class="lex-p">' + esc(ex[2]) + "</span>" : "") + "</button></li>";
+      }).join("") + "</ul>" +
+      '<details class="lex-q"><summary>Exercício — ' + esc(L.exercicio.pergunta) + '</summary><p class="lex-a">' + esc(L.exercicio.resposta) + "</p></details>" +
+      "</article>";
+  }
+  function revisaoCard(R) {
+    return '<article class="lex revisao">' +
+      "<h3>" + esc(R.titulo) + "</h3>" +
+      '<ul class="lex-itens">' + R.itens.map(function (it) {
+        return '<li><span class="lex-tag ' + it.lang + '">' + esc(LICOES_LANG_LAB[it.lang]) + "</span>" + esc(it.texto) + "</li>";
+      }).join("") + "</ul>" +
+      '<details class="lex-q"><summary>Autoavaliação — ' + esc(R.exercicio.pergunta) + '</summary><p class="lex-a">' + esc(R.exercicio.resposta) + "</p></details>" +
+      "</article>";
+  }
+  function lessonPanel(n) {
+    var L = LICOES[n];
+    if (!L) return "";
+    var body;
+    if (L.revisao) {
+      body = revisaoCard(L.revisao);
+    } else {
+      body = ["jp", "zh", "en"].filter(function (k) { return L[k]; }).map(function (k) { return lexCard(k, L[k]); }).join("");
+    }
+    return '<section class="panel"><div class="panel-head"><h2>Aula do dia</h2><p>Explicação, exemplos com áudio e um exercício rápido por língua.</p></div>' +
+      '<div class="lex-grid">' + body + "</div></section>";
+  }
+
   // ---------- telas ----------
   function renderSetup() {
     app.innerHTML =
@@ -223,6 +259,8 @@
         '<p class="notice">' + esc(W[1]) + ": " + W[2] + " conceitos novos por dia útil. Peça ao Claude o CSV da semana " + w + " e importe no Anki.</p></section>";
     }
 
+    var aula = lessonPanel(n);
+
     var bl = blocksFor(n), got = state.log[n] || [];
     var total = bl.reduce(function (a, b) { return a + b.m; }, 0);
     var blocks = '<section class="panel"><div class="panel-head"><h2>Plano do dia</h2><p>' + fmtMin(total) + " no modo " + (state.mode === "turbo" ? "Turbo" : "Núcleo") + ". Marque cada bloco ao terminar.</p></div>" +
@@ -260,7 +298,7 @@
       '<button class="btn" data-act="reset">Apagar progresso</button></div>' +
       '<p class="hint" style="margin-top:12px">O progresso fica neste navegador. Para usar no celular e no computador, exporte num e importe no outro.</p></details>';
 
-    app.innerHTML = head + (notice ? '<p class="notice">' + notice + "</p>" : "") + quadra + blocks + year + settings;
+    app.innerHTML = head + (notice ? '<p class="notice">' + notice + "</p>" : "") + quadra + aula + blocks + year + settings;
   }
 
   function renderMetodo() {

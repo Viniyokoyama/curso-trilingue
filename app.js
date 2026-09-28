@@ -22,6 +22,8 @@
     start: LS.get("ct_start", null),
     mode: LS.get("ct_mode", "nucleo"),
     log: LS.get("ct_log", {}),
+    aulas: LS.get("ct_aulas", {}),
+    xp: LS.get("ct_xp", 0),
     viewDay: null,
     planFilter: 0,
     vocabWeek: 0,
@@ -33,6 +35,8 @@
     LS.set("ct_start", state.start);
     LS.set("ct_mode", state.mode);
     LS.set("ct_log", state.log);
+    LS.set("ct_aulas", state.aulas);
+    LS.set("ct_xp", state.xp);
   }
 
   // ---------- utilidades ----------
@@ -207,8 +211,342 @@
     } else {
       body = ["jp", "zh", "en"].filter(function (k) { return L[k]; }).map(function (k) { return lexCard(k, L[k]); }).join("");
     }
-    return '<section class="panel"><div class="panel-head"><h2>Aula do dia</h2><p>Explicação, exemplos com áudio e um exercício rápido por língua.</p></div>' +
-      '<div class="lex-grid">' + body + "</div></section>";
+    return '<details class="panel mat"><summary><h2>Material de consulta</h2><span>A teoria de hoje, para reler quando quiser</span></summary>' +
+      '<div class="lex-grid">' + body + "</div></details>";
+  }
+
+  // ---------- aula interativa ----------
+  var CJK = /[぀-ヿ㐀-鿿]/;
+  var CJK_RUN = /[぀-ヿ㐀-鿿々]+/g;
+  var VLANGS = ["en", "jp", "zh", "es"];
+  var SPK = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a4.5 4.5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+  var PRAISE = ["Isso!", "Correto!", "Mandou bem!", "Perfeito!", "Exato!"];
+
+  function shuffle(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function rnd(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function langAttr(s, lang) { return CJK.test(s) ? ' lang="' + (lang === "zh" ? "zh-CN" : "ja") + '"' : ""; }
+
+  function vText(v, lang) {
+    if (lang === "en") return { label: v[2], say: v[2] };
+    if (lang === "es") return { label: v[8], say: v[8] };
+    if (lang === "jp") return { label: v[3], sub: v[3] === v[4] ? v[5] : v[4] + " · " + v[5], say: v[4] };
+    return { label: v[6], sub: v[7], say: v[6] };
+  }
+  function sayOf(ex, lang) {
+    if (lang === "en") return ex[0];
+    var s = (ex[0].match(CJK_RUN) || []).join(" ");
+    if (!s) s = ((ex[2] || "").match(CJK_RUN) || []).join(" ");
+    return s;
+  }
+
+  function vocabQ(v, type, lang) {
+    var key = function (x) { return type === "b" ? x[1] : vText(x, lang).label; };
+    var seen = {}, others = [];
+    seen[key(v)] = 1; seen["pt" + v[1]] = 1;
+    shuffle(VOCAB).some(function (x) {
+      if (seen[key(x)] || seen["pt" + x[1]]) return false;
+      seen[key(x)] = 1; seen["pt" + x[1]] = 1; others.push(x);
+      return others.length >= 3;
+    });
+    var me = vText(v, lang);
+    var opts = [v].concat(others).map(function (x, i) {
+      if (type === "b") return { label: x[1], ok: i === 0 };
+      var t = vText(x, lang);
+      return { label: t.label, sub: t.sub, lang: lang, ok: i === 0 };
+    });
+    var q = { kind: "q", lang: lang, opts: shuffle(opts), e: v[9] ? "Ponte: " + v[9] : "", say: me.say, sayLang: lang };
+    if (type === "a") { q.q = "Como se diz em " + LANG_NAME[lang] + "?"; q.t = v[1]; q.hideSay = true; }
+    else if (type === "b") { q.q = "O que significa?"; q.t = me.label; q.tSub = me.sub; q.tLang = lang; q.auto = true; }
+    else { q.q = "Toque no que você ouviu"; q.listen = true; q.auto = true; }
+    q.answer = type === "b" ? v[1] : me.label + (me.sub ? " (" + me.sub + ")" : "");
+    return q;
+  }
+
+  function quizQ(item, lang) {
+    var t = item[1] || "", say = "";
+    if (t && t.indexOf("→") < 0 && t.indexOf("___") < 0) say = lang === "en" ? t : (t.match(CJK_RUN) || []).join(" ");
+    return {
+      kind: "q", lang: lang, q: item[0], t: t, tLang: lang, say: say, sayLang: lang,
+      hideSay: /lê|som|soa|tônica|pronuncia/i.test(item[0]),
+      opts: shuffle(item[2].map(function (o, i) { return { label: o, lang: lang, ok: i === 0 }; })),
+      e: item[3] || "", answer: item[2][0]
+    };
+  }
+
+  function quadraOf(n) {
+    if (n > 28) return [];
+    var w = weekOf(n), d = dowOf(n);
+    if (d <= 5) { var i0 = (w - 1) * 25 + (d - 1) * 5; return VOCAB.slice(i0, i0 + 5); }
+    return VOCAB.slice((w - 1) * 25, w * 25);
+  }
+
+  function buildSession(n) {
+    var L = LICOES[n], Q = QUIZ[n] || {}, steps = [];
+    var quad = quadraOf(n);
+    if (L && !L.revisao) {
+      var first = [], last = [];
+      if (quad.length) {
+        steps.push({ kind: "words", items: quad });
+        quad.forEach(function (v) {
+          first.push(vocabQ(v, "a", rnd(VLANGS)));
+          last.push(vocabQ(v, rnd(["b", "c"]), rnd(VLANGS)));
+        });
+        steps = steps.concat(shuffle(first));
+      } else {
+        shuffle(VOCAB).slice(0, 6).forEach(function (v) { last.push(vocabQ(v, rnd(["a", "b", "c"]), rnd(VLANGS))); });
+      }
+      ["jp", "zh", "en"].forEach(function (k) {
+        if (!L[k]) return;
+        steps.push({ kind: "teoria", lang: k, L: L[k] });
+        (Q[k] || []).forEach(function (it) { steps.push(quizQ(it, k)); });
+      });
+      return { title: "Aula do dia " + n, steps: steps.concat(shuffle(last)) };
+    }
+    var rev = !!(L && L.revisao), w = weekOf(n), pool = [];
+    var from = rev ? (w - 1) * 7 + 1 : 1, to = rev ? n - 1 : 30;
+    for (var i = from; i <= to; i++) {
+      if (!QUIZ[i]) continue;
+      ["jp", "zh", "en"].forEach(function (k) { (QUIZ[i][k] || []).forEach(function (it) { pool.push([it, k]); }); });
+    }
+    var qs = shuffle(pool).slice(0, rev ? 10 : 8).map(function (p) { return quizQ(p[0], p[1]); });
+    shuffle(rev ? quad : VOCAB).slice(0, 6).forEach(function (v) { qs.push(vocabQ(v, rnd(["a", "b", "c"]), rnd(VLANGS))); });
+    if (rev) steps.push({ kind: "revisao", R: L.revisao });
+    return { title: rev ? L.revisao.titulo : "Treino de revisão", steps: steps.concat(shuffle(qs)) };
+  }
+
+  var actx = null;
+  function beep(kind) {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      var notes = kind === "end" ? [523, 659, 784, 1047] : kind === "ok" ? [659, 880] : [220, 175];
+      notes.forEach(function (f, i) {
+        var o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + i * 0.09;
+        o.type = kind === "bad" ? "square" : "sine";
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(kind === "bad" ? 0.04 : 0.12, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+        o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.18);
+      });
+    } catch (e) { /* sem áudio: segue sem som */ }
+  }
+
+  var LX = null, lsEl = null;
+
+  function openLesson(n) {
+    var s = buildSession(n);
+    LX = {
+      n: n, title: s.title, queue: s.steps, i: 0, xp: 0, first: 0, streak: 0, phase: "idle", sel: -1, t0: Date.now(),
+      total: s.steps.filter(function (x) { return x.kind === "q"; }).length
+    };
+    lsEl = document.createElement("div");
+    lsEl.className = "ls";
+    lsEl.setAttribute("role", "dialog");
+    lsEl.setAttribute("aria-modal", "true");
+    lsEl.setAttribute("aria-label", s.title);
+    lsEl.addEventListener("click", lsClick);
+    document.body.appendChild(lsEl);
+    document.body.classList.add("ls-open");
+    lsRender();
+  }
+
+  function closeLesson() {
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    if (lsEl) lsEl.remove();
+    lsEl = null; LX = null;
+    document.body.classList.remove("ls-open");
+  }
+
+  function sayBtn(text, lang, cls, label) {
+    return '<button class="' + cls + '" data-l="say" data-say="' + esc(text) + '" data-lang="' + lang + '" aria-label="' + (label || "Ouvir") + '">' + SPK + "</button>";
+  }
+
+  function lsBody(st) {
+    var S = LX;
+    if (st.kind === "words") {
+      return '<p class="ls-k">Palavras novas</p><h2 class="ls-h">Ouça cada uma e repita em voz alta</h2><div class="ls-words">' +
+        st.items.map(function (v) {
+          return '<div class="ls-word"><strong>' + esc(v[1]) + "</strong>" + VLANGS.map(function (l) {
+            var t = vText(v, l);
+            return '<button class="ls-w ' + l + '" data-l="say" data-say="' + esc(t.say) + '" data-lang="' + l + '"><span class="ls-lab">' + l.toUpperCase() + "</span>" +
+              "<span" + langAttr(t.label, l) + ">" + esc(t.label) + "</span>" + (t.sub ? "<small>" + esc(t.sub) + "</small>" : "") + "</button>";
+          }).join("") + (v[9] ? '<p class="ls-ponte">' + esc(v[9]) + "</p>" : "") + "</div>";
+        }).join("") + "</div>";
+    }
+    if (st.kind === "teoria") {
+      var L = st.L;
+      return '<p class="ls-k ' + st.lang + '">' + LICOES_LANG_LAB[st.lang] + " · teoria</p><h2 class=\"ls-h\">" + esc(L.titulo) + "</h2>" +
+        '<p class="ls-exp">' + esc(L.explicacao) + '</p><ul class="ls-exs">' + L.exemplos.map(function (ex) {
+          var s = sayOf(ex, st.lang);
+          return '<li><button class="ls-ex" data-l="say" data-say="' + esc(s) + '" data-lang="' + st.lang + '"' + (s ? "" : " disabled") + ">" + (s ? SPK : "") +
+            "<span><b" + langAttr(ex[0], st.lang) + ">" + esc(ex[0]) + "</b>" + (ex[1] ? "<small>" + esc(ex[1]) + "</small>" : "") + "</span>" +
+            (ex[2] ? "<em>" + esc(ex[2]) + "</em>" : "") + "</button></li>";
+        }).join("") + "</ul>";
+    }
+    if (st.kind === "revisao") {
+      return '<p class="ls-k">Revisão</p><h2 class="ls-h">' + esc(st.R.titulo) + '</h2><ul class="ls-rev">' + st.R.itens.map(function (it) {
+        return '<li><span class="lex-tag ' + it.lang + '">' + LICOES_LANG_LAB[it.lang] + "</span>" + esc(it.texto) + "</li>";
+      }).join("") + '</ul><p class="ls-exp">Primeiro, um treino rápido com o que você viu na semana. Depois, faça as tarefas acima.</p>';
+    }
+    var prompt = "";
+    var showSay = st.say && (!st.hideSay || S.phase !== "idle");
+    if (st.listen) prompt = '<div class="ls-listen">' + sayBtn(st.say, st.sayLang, "ls-bigspk", "Ouvir de novo") + "<span>Toque para ouvir de novo</span></div>";
+    else if (st.t) {
+      prompt = '<div class="ls-prompt">' + (showSay ? sayBtn(st.say, st.sayLang, "ls-spk") : "") +
+        '<span class="ls-t"' + langAttr(st.t, st.tLang) + ">" + esc(st.t) + "</span>" + (st.tSub ? "<small>" + esc(st.tSub) + "</small>" : "") + "</div>";
+    }
+    return '<p class="ls-k ' + st.lang + '">' + LICOES_LANG_LAB[st.lang] + '</p><h2 class="ls-h">' + esc(st.q) + "</h2>" + prompt +
+      '<div class="ls-opts">' + st.opts.map(function (o, i) {
+        var cls = "ls-opt";
+        if (S.phase !== "idle") { if (o.ok) cls += " is-ok"; else if (i === S.sel) cls += " is-bad"; else cls += " is-off"; }
+        else if (i === S.sel) cls += " is-sel";
+        return '<button class="' + cls + '" data-l="opt" data-i="' + i + '"' + (S.phase !== "idle" ? " disabled" : "") + ' aria-pressed="' + (i === S.sel) + '">' +
+          "<kbd>" + (i + 1) + "</kbd><span><span" + langAttr(o.label, o.lang) + ">" + esc(o.label) + "</span>" + (o.sub ? "<small>" + esc(o.sub) + "</small>" : "") + "</span></button>";
+      }).join("") + "</div>";
+  }
+
+  function lsEnd() {
+    var S = LX, acc = S.total ? Math.round((S.first / S.total) * 100) : 100;
+    var mins = Math.max(1, Math.round((Date.now() - S.t0) / 60000));
+    S.acc = acc;
+    var msg = acc === 100 ? "Nenhum erro. Impecável." :
+      acc >= 80 ? "Muito bom. Os erros de hoje já voltaram uma vez; o Anki cuida do resto." :
+      "Vale refazer amanhã antes da aula nova: os pontos que você errou precisam de mais uma passada.";
+    return '<div class="ls-end"><p class="ls-k">' + esc(S.title) + '</p><h2 class="ls-h ls-big">Aula concluída!</h2>' +
+      '<div class="ls-stats"><div><b>' + S.xp + "</b><span>XP</span></div><div><b>" + acc + "%</b><span>de acerto de primeira</span></div>" +
+      "<div><b>" + mins + " min</b><span>de aula</span></div></div><p class=\"ls-exp\">" + msg + "</p></div>";
+  }
+
+  function lsRender() {
+    var S = LX, st = S.queue[S.i];
+    var pct = Math.round((S.i / S.queue.length) * 100);
+    var top = '<header class="ls-top"><button class="ls-x" data-l="close" aria-label="Sair da aula">×</button>' +
+      '<div class="ls-bar" role="progressbar" aria-label="Progresso da aula" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+      '<span class="ls-xp">' + S.xp + " XP</span></header>";
+    var body, foot;
+    if (!st) {
+      body = lsEnd();
+      foot = '<footer class="ls-foot"><div class="ls-fb"></div><button class="ls-btn" data-l="finish">Concluir</button></footer>';
+    } else if (st.kind !== "q") {
+      body = lsBody(st);
+      foot = '<footer class="ls-foot"><div class="ls-fb"></div><button class="ls-btn" data-l="next">' + (st.kind === "teoria" ? "Praticar" : "Continuar") + "</button></footer>";
+    } else {
+      body = lsBody(st);
+      if (S.phase === "idle") {
+        foot = '<footer class="ls-foot"><div class="ls-fb"></div><button class="ls-btn" data-l="check"' + (S.sel < 0 ? " disabled" : "") + ">Verificar</button></footer>";
+      } else if (S.phase === "ok") {
+        foot = '<footer class="ls-foot ok" role="status"><div class="ls-fb"><strong>' + (S.streak >= 3 ? S.streak + " seguidas!" : rnd(PRAISE)) + "</strong>" +
+          (st.e ? "<p>" + esc(st.e) + "</p>" : "") + '</div><button class="ls-btn" data-l="next">Continuar</button></footer>';
+      } else {
+        foot = '<footer class="ls-foot bad" role="status"><div class="ls-fb"><strong>Resposta certa: <span' + langAttr(st.answer, st.lang) + ">" + esc(st.answer) + "</span></strong>" +
+          (st.e ? "<p>" + esc(st.e) + "</p>" : "") + '<p class="ls-again">Essa volta no fim da aula.</p></div><button class="ls-btn" data-l="next">Continuar</button></footer>';
+      }
+    }
+    lsEl.innerHTML = top + '<div class="ls-body"><div class="ls-in">' + body + "</div></div>" + foot;
+    if (st && st.kind === "q" && S.phase === "idle" && st.auto && !st.played) {
+      st.played = true;
+      setTimeout(function () { if (LX && LX.queue[LX.i] === st) speak(st.say, st.sayLang); }, 250);
+    }
+  }
+
+  function lsCheck() {
+    var S = LX, st = S.queue[S.i];
+    if (!st || st.kind !== "q" || S.sel < 0 || S.phase !== "idle") return;
+    st.tries = (st.tries || 0) + 1;
+    if (st.opts[S.sel].ok) {
+      S.streak++;
+      S.xp += st.tries === 1 ? 10 : 5;
+      if (st.tries === 1) S.first++;
+      S.phase = "ok";
+      beep("ok");
+      if (st.say && (st.hideSay || !st.auto)) setTimeout(function () { speak(st.say, st.sayLang); }, 300);
+    } else {
+      S.streak = 0;
+      S.phase = "bad";
+      beep("bad");
+      S.queue.push(Object.assign({}, st, { opts: shuffle(st.opts), played: false }));
+    }
+    lsRender();
+  }
+
+  function lsNext() {
+    var S = LX;
+    S.i++; S.phase = "idle"; S.sel = -1;
+    if (S.i >= S.queue.length) beep("end");
+    lsRender();
+    var b = lsEl.querySelector(".ls-body");
+    if (b) b.scrollTop = 0;
+  }
+
+  function lsFinish() {
+    var S = LX, prev = state.aulas[S.n] || { xp: 0, acc: 0, vezes: 0 };
+    state.aulas[S.n] = { xp: Math.max(prev.xp, S.xp), acc: Math.max(prev.acc, S.acc || 0), vezes: prev.vezes + 1 };
+    state.xp += S.xp;
+    if (blocksFor(S.n).some(function (b) { return b.id === "novas"; })) {
+      var arr = state.log[S.n] || [];
+      if (arr.indexOf("novas") < 0) state.log[S.n] = arr.concat("novas");
+    }
+    save();
+    closeLesson();
+    rerender();
+    toast("+" + S.xp + " XP. Aula salva.");
+  }
+
+  function lsClick(e) {
+    var t = e.target.closest("[data-l]");
+    if (!t || !LX) return;
+    var a = t.dataset.l;
+    if (a === "say") { if (t.dataset.say) speak(t.dataset.say, t.dataset.lang); return; }
+    if (a === "close") {
+      if (LX.i >= LX.queue.length || confirm("Sair da aula? O progresso desta aula não será salvo.")) closeLesson();
+      return;
+    }
+    if (a === "opt") { if (LX.phase === "idle") { LX.sel = Number(t.dataset.i); lsRender(); } return; }
+    if (a === "check") { lsCheck(); return; }
+    if (a === "next") { lsNext(); return; }
+    if (a === "finish") lsFinish();
+  }
+
+  document.addEventListener("keydown", function (e) {
+    if (!LX) return;
+    var st = LX.queue[LX.i];
+    if (e.key === "Escape") { lsEl.querySelector('[data-l="close"]').click(); return; }
+    if (st && st.kind === "q" && LX.phase === "idle" && /^[1-4]$/.test(e.key) && st.opts[Number(e.key) - 1]) {
+      LX.sel = Number(e.key) - 1; lsRender(); return;
+    }
+    if (e.key === "Enter") {
+      var b = lsEl.querySelector(".ls-btn:not([disabled])");
+      if (b) { e.preventDefault(); b.click(); }
+    }
+  });
+
+  function heroAula(n) {
+    var L = LICOES[n], a = state.aulas[n], s = buildSession(n);
+    var nq = s.steps.filter(function (x) { return x.kind === "q"; }).length;
+    var nt = s.steps.filter(function (x) { return x.kind === "teoria"; }).length;
+    var mins = Math.round(nq * 0.5 + nt * 3 + 2);
+    var kicker, topics;
+    if (L && !L.revisao) {
+      kicker = "Aula guiada";
+      topics = '<ul class="hero-top">' + ["jp", "zh", "en"].filter(function (k) { return L[k]; }).map(function (k) {
+        return '<li><span class="lex-tag ' + k + '">' + LICOES_LANG_LAB[k] + "</span>" + esc(L[k].titulo) + "</li>";
+      }).join("") + "</ul>";
+    } else if (L) {
+      kicker = "Revisão da semana";
+      topics = '<p class="hero-p">Questões de tudo o que você viu nos últimos dias, misturadas nas três línguas e no vocabulário.</p>';
+    } else {
+      kicker = "Treino";
+      topics = '<p class="hero-p">A aula guiada deste dia ainda não foi escrita. Enquanto isso, treine com questões do mês 1.</p>';
+    }
+    return '<section class="hero' + (a ? " is-done" : "") + '"><div class="hero-txt"><p class="hero-k">' + kicker + "</p>" +
+      "<h2>" + esc(s.title) + "</h2>" + topics +
+      '<p class="hero-meta">' + nq + " exercícios · cerca de " + mins + " min" +
+      (a ? ' · <b>Feita' + (a.vezes > 1 ? " " + a.vezes + " vezes" : "") + ", melhor acerto " + a.acc + "%</b>" : "") + "</p></div>" +
+      '<button class="hero-btn" data-act="aula">' + (a ? "Refazer aula" : "Começar aula") + "</button></section>";
   }
 
   // ---------- telas ----------
@@ -285,7 +623,8 @@
     var year = '<section class="panel"><div class="panel-head"><h2>O ano</h2><p>Cada quadrado é um dia. Toque para abrir.</p></div>' +
       '<div class="stats"><div class="stat"><b>' + done + '</b><span>dias concluídos</span></div>' +
       '<div class="stat"><b>' + streak() + '</b><span>dias seguidos</span></div>' +
-      '<div class="stat"><b>' + Math.round((done / TOTAL) * 100) + '%</b><span>do ano</span></div></div>' +
+      '<div class="stat"><b>' + Math.round((done / TOTAL) * 100) + '%</b><span>do ano</span></div>' +
+      '<div class="stat"><b>' + state.xp + '</b><span>XP total</span></div></div>' +
       '<div class="year-wrap"><div class="year">' + cells + "</div></div>" +
       '<div class="legend"><span><i style="background:var(--done)"></i>Concluído</span><span><i style="background:var(--partial)"></i>Parcial</span>' +
       '<span><i style="background:var(--missed)"></i>Passou sem registro</span><span><i style="background:var(--future);box-shadow:inset 0 0 0 1.5px var(--zh)"></i>Semana de checkpoint</span></div></section>';
@@ -298,7 +637,7 @@
       '<button class="btn" data-act="reset">Apagar progresso</button></div>' +
       '<p class="hint" style="margin-top:12px">O progresso fica neste navegador. Para usar no celular e no computador, exporte num e importe no outro.</p></details>';
 
-    app.innerHTML = head + (notice ? '<p class="notice">' + notice + "</p>" : "") + quadra + aula + blocks + year + settings;
+    app.innerHTML = head + (notice ? '<p class="notice">' + notice + "</p>" : "") + heroAula(n) + quadra + blocks + aula + year + settings;
   }
 
   function renderMetodo() {
@@ -470,15 +809,16 @@
     } else if (act === "prev") { state.viewDay = clamp(cur - 1, 1, TOTAL); rerender(); }
     else if (act === "next") { state.viewDay = clamp(cur + 1, 1, TOTAL); rerender(); }
     else if (act === "today") { state.viewDay = null; rerender(); }
+    else if (act === "aula") { openLesson(cur); }
     else if (act === "savestart") {
       var nv = document.getElementById("startEdit").value;
       if (!nv) { toast("Escolha uma data válida."); return; }
       state.start = nv; state.viewDay = null; save(); rerender(); toast("Data do dia 1 salva.");
     } else if (act === "export") {
-      download("progresso-curso-trilingue.json", JSON.stringify({ start: state.start, mode: state.mode, log: state.log }, null, 2), "application/json");
+      download("progresso-curso-trilingue.json", JSON.stringify({ start: state.start, mode: state.mode, log: state.log, aulas: state.aulas, xp: state.xp }, null, 2), "application/json");
       toast("Progresso exportado.");
     } else if (act === "reset") {
-      if (confirm("Apagar todo o progresso marcado? A data do dia 1 continua.")) { state.log = {}; save(); rerender(); toast("Progresso apagado."); }
+      if (confirm("Apagar todo o progresso marcado, aulas e XP? A data do dia 1 continua.")) { state.log = {}; state.aulas = {}; state.xp = 0; save(); rerender(); toast("Progresso apagado."); }
     } else if (act === "training") {
       state.training = !state.training; renderVocab();
     } else if (act === "csv") { csvExport(); }
@@ -507,6 +847,8 @@
           state.start = data.start || state.start;
           state.mode = data.mode === "turbo" ? "turbo" : "nucleo";
           state.log = data.log;
+          if (data.aulas && typeof data.aulas === "object") state.aulas = data.aulas;
+          if (typeof data.xp === "number") state.xp = data.xp;
           state.viewDay = null;
           save(); route(); toast("Progresso importado.");
         } catch (err) { toast("Arquivo inválido: use um backup exportado por este site."); }

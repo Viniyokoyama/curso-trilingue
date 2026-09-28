@@ -35,6 +35,8 @@ npx vercel --prod
 | `data-metodo.js` | Texto da aba Método, em markdown |
 | `data-plano.js` | As 52 semanas, os trimestres e os 30 dias do mês 1 |
 | `data-vocab.js` | Os conceitos da quadra; novas semanas entram aqui |
+| `data-licoes.js` | A teoria de cada dia: explicação e exemplos por língua |
+| `data-quiz.js` | As questões de múltipla escolha de cada dia (a primeira opção é a certa) |
 | `app.js` | Lógica do site |
 | `styles.css` | Visual |
 

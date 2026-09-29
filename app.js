@@ -502,18 +502,20 @@
       const opts = step.opcoes.map((o, i) => {
         let cls = "";
         if (ans) cls = o === w ? "right" : i === ans.i ? "wrong" : "dim";
+        const fora = !ans && step.fora && step.fora.includes(i);
+        if (fora) cls = "out";
         let label;
         if (step.modo === "reconhecer") label = `<span>${esc(o.pt)}</span>`;
         else {
           const ov = view(o, lang);
           label = `<span class="main" lang="${LANGS[lang].attr}">${esc(ov.main)}</span>${apoio && ov.sub ? `<small>${esc(ov.sub)}</small>` : ""}`;
         }
-        return `<button class="opt ${cls}" data-act="answer" data-i="${i}" ${ans ? "disabled" : ""}><kbd>${i + 1}</kbd>${label}</button>`;
+        return `<button class="opt ${cls}" data-act="answer" data-i="${i}" ${ans || fora ? "disabled" : ""}><kbd>${i + 1}</kbd>${label}</button>`;
       }).join("");
       body = `<div class="opts ${step.modo === "reconhecer" ? "" : "target"} ${w.frase ? "frases" : ""}">${opts}</div>`;
     } else if (step.modo === "digitar") {
       body = `<form class="typing" data-form="digitar" autocomplete="off">
-        <input name="resposta" ${ans ? "disabled" : ""} value="${ans ? esc(ans.texto) : ""}" autocapitalize="off" spellcheck="false" lang="${LANGS[lang].attr}" aria-label="Sua resposta">
+        <input name="resposta" ${ans ? "disabled" : ""} value="${esc(ans ? ans.texto : step.rascunho || "")}" autocapitalize="off" spellcheck="false" lang="${LANGS[lang].attr}" aria-label="Sua resposta">
         ${ans ? "" : `<button class="btn primary" type="submit">Verificar</button>`}
       </form>`;
     } else if (step.modo === "montar") {
@@ -553,12 +555,101 @@
       }
     }
 
-    $app.innerHTML = `${head}<section class="card stage">${prompt}${body}${fb}</section>`;
+    $app.innerHTML = `${head}<section class="card stage">${prompt}${body}${dicaHtml(step, ans)}${fb}</section>`;
     if (step.modo === "ouvir" && !ans && !step.tocou) { step.tocou = true; speak(v.fala, lang); }
     if (step.modo === "digitar" && !ans) {
       const input = $app.querySelector("input[name=resposta]");
-      if (input) input.focus();
+      if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
     }
+  }
+
+  // ---------- dicas ----------
+  // Resposta esperada no exercício de digitar (a primeira forma aceita).
+  function respostaEsperada(w) {
+    if (w.leitura) return w.pt.replace(/\([^)]*\)/g, "").trim();
+    if (lang === "jp") return w.jr;
+    if (lang === "zh") return w.py;
+    const en = w.en.replace(/\([^)]*\)/g, "").trim();
+    return /[.?!…]$/.test(en) ? en : en.split(/,\s*|\s+\/\s+/)[0];
+  }
+  // "watashi wa gakusei" → "w______ w_ g______"
+  const padrao = t => t.replace(/\p{L}+/gu, p => p[0] + "_".repeat(p.length - 1));
+
+  function notaDe(w) {
+    if (lesson.unit.nota && lesson.unit.nota[lang]) return lesson.unit.nota[lang];
+    const u = TRACK[lang].units.find(u => !u.revisao && u.nota[lang] && u.itens.includes(w));
+    return u ? u.nota[lang] : "";
+  }
+
+  const ESCOLHA = ["reconhecer", "produzir", "ouvir"];
+  function podeDica(step) {
+    const n = step.dica || 0;
+    if (step.modo === "digitar") return n < 2;
+    if (step.modo === "montar") {
+      const tk = tokens(step.w, lang), M = step.montar;
+      return !(M && M.built.length === tk.length && M.built.every((pi, k) => M.pool[pi] === tk[k]));
+    }
+    return n < 1;
+  }
+
+  function dicaTexto(step) {
+    const w = step.w, v = view(w, lang), n = step.dica;
+    if (ESCOLHA.includes(step.modo)) {
+      const linhas = ["Duas alternativas erradas saíram."];
+      if (step.modo === "produzir" && !w.leitura) {
+        const r = respostaEsperada(w);
+        linhas.push(`Começa com <b>${esc(w.frase ? r.split(/\s+/)[0] : r.slice(0, 2))}…</b>`);
+      }
+      if (step.modo === "reconhecer" && !w.leitura && v.sub && !settings().apoio) linhas.push(`Leitura: <b>${esc(v.sub)}</b>`);
+      if (step.modo === "ouvir") linhas.push("Tocou devagar. Use 🐢 para ouvir de novo.");
+      return linhas.join("<br>");
+    }
+    if (step.modo === "digitar") {
+      const r = respostaEsperada(w);
+      return n === 1
+        ? `Primeira letra de cada palavra: <code class="padrao">${esc(padrao(r))}</code>`
+        : `Resposta: <b>${esc(r)}</b>. Digite para fixar.`;
+    }
+    if (step.modo === "montar") return "O começo certo da frase foi montado. Continue daí.";
+    return `Ouça devagar e repita junto${v.sub ? `: <b>${esc(v.sub)}</b>` : "."}`;
+  }
+
+  function dicaHtml(step, ans) {
+    const nota = notaDe(step.w);
+    const caixa = step.dica ? `<div class="dica-box">
+        <p>💡 ${dicaTexto(step)}</p>
+        ${nota ? `<details><summary>📖 Rever a explicação da unidade</summary><div class="texto">${paragraphs(nota)}</div></details>` : ""}
+      </div>` : "";
+    const botao = !ans && podeDica(step)
+      ? `<button class="btn dica" data-act="dica">💡 ${step.dica ? (step.modo === "montar" ? "Próximo bloco" : "Mais uma dica") : "Dica"}</button>`
+      : "";
+    return caixa + botao;
+  }
+
+  function darDica() {
+    const step = lesson.steps[lesson.pos];
+    if (!step || step.t !== "quiz" || lesson.answered || !podeDica(step)) return;
+    if (step.modo === "digitar") { const input = $app.querySelector("input[name=resposta]"); if (input) step.rascunho = input.value; }
+    step.dica = (step.dica || 0) + 1;
+    lesson.dicas = (lesson.dicas || 0) + 1;
+    const v = view(step.w, lang);
+    if (ESCOLHA.includes(step.modo) && !step.fora) {
+      const erradas = step.opcoes.map((o, i) => (o === step.w ? -1 : i)).filter(i => i >= 0);
+      step.fora = pick(erradas, 2);
+    }
+    if (step.modo === "ouvir" || step.modo === "falar") speak(v.fala, lang, 0.5);
+    if (step.modo === "montar") {
+      // Mantém só o começo que já está certo e acrescenta o próximo bloco.
+      const M = step.montar, tk = tokens(step.w, lang);
+      let k = 0;
+      while (k < M.built.length && M.pool[M.built[k]] === tk[k]) k++;
+      M.built = M.built.slice(0, k);
+      if (k < tk.length) {
+        const pi = M.pool.findIndex((t, i) => t === tk[k] && !M.built.includes(i));
+        if (pi >= 0) M.built.push(pi);
+      }
+    }
+    renderLesson();
   }
 
   function setAnswer(ok, extra = {}) {
@@ -568,15 +659,16 @@
       lesson.erros++;
       if (step.fase === "final") lesson.steps.push({ t: "quiz", w: step.w, fase: "final", modo: step.modo });
     }
-    if (lesson.tipo === "srs" && step.primeira) updateSrs(step.w, ok);
+    if (lesson.tipo === "srs" && step.primeira) updateSrs(step.w, ok, !!step.dica);
     if (ok && !extra.pulou) speak(view(step.w, lang).fala, lang);
     renderLesson();
   }
 
-  function updateSrs(w, ok) {
+  // Acerto com dica não sobe de caixa: o item volta no mesmo intervalo de antes.
+  function updateSrs(w, ok, comDica) {
     const s = srsOf(lang);
     const cur = s[w.key] || { b: 0, d: today() };
-    const b = ok ? Math.min(cur.b + 1, INTERVALOS.length - 1) : 1;
+    const b = !ok ? 1 : comDica ? Math.max(cur.b, 1) : Math.min(cur.b + 1, INTERVALOS.length - 1);
     s[w.key] = { b, d: today() + INTERVALOS[b] };
     persist();
   }
@@ -626,12 +718,15 @@
     const ans = lesson.answered;
     lesson.answered = null;
     if (step && step.t === "quiz" && ans && !ans.ok && step.fase === "palavra") {
-      step.opcoes = null; step.montar = null; step.tocou = false; // mesmo exercício, embaralhado de novo
+      // mesmo exercício, embaralhado de novo e sem a dica anterior
+      step.opcoes = null; step.montar = null; step.tocou = false; step.dica = 0; step.fora = null; step.rascunho = "";
     } else {
       lesson.pos++;
     }
     renderLesson();
   }
+
+  const dicasUsadas = L => (L.dicas ? ` Você usou ${L.dicas} dica${L.dicas > 1 ? "s" : ""}.` : "");
 
   function renderResult(head) {
     const L = lesson;
@@ -641,7 +736,7 @@
       const total = L.unit.itens.length;
       html = `<p class="kicker">Revisão concluída</p>
         <h2>${total - Math.min(e, total)} de ${total} de primeira</h2>
-        <p class="muted">Os itens que você errou voltam amanhã. Os que acertou voltam cada vez mais espaçados.</p>
+        <p class="muted">Os itens que você errou voltam amanhã. Os que acertou sem dica voltam cada vez mais espaçados.${dicasUsadas(L)}</p>
         <div class="row">
           <button class="btn" data-act="quit">Voltar à trilha</button>
           ${dueItems(lang).length ? `<button class="btn primary" data-act="srs">Revisar mais</button>` : ""}
@@ -658,7 +753,7 @@
       html = `<p class="kicker">Unidade concluída</p>
         <p class="stars huge">${"★".repeat(stars)}${"☆".repeat(3 - stars)}</p>
         <h2>${esc(L.unit.titulo)}</h2>
-        <p class="muted">${e === 0 ? "Sem nenhum erro." : `${e} erro${e > 1 ? "s" : ""} no caminho. Refaça quando quiser para ganhar 3 estrelas.`}</p>
+        <p class="muted">${e === 0 ? "Sem nenhum erro." : `${e} erro${e > 1 ? "s" : ""} no caminho. Refaça quando quiser para ganhar 3 estrelas.`}${dicasUsadas(L)}</p>
         <div class="row">
           <button class="btn" data-act="quit">Voltar à trilha</button>
           ${nextIdx !== null ? `<button class="btn primary" data-act="start" data-idx="${nextIdx}">Próxima unidade</button>` : ""}
@@ -695,6 +790,8 @@
       speak(b.dataset.text, lang);
     } else if (act === "slow") {
       speak(b.dataset.text, lang, 0.5);
+    } else if (act === "dica") {
+      darDica();
     } else if (act === "answer") {
       answerChoice(Number(b.dataset.i));
     } else if (act === "build") {
@@ -730,7 +827,10 @@
     const step = lesson.steps[lesson.pos];
     if (!step) return;
     const escolha = step.t === "quiz" && ["reconhecer", "produzir", "ouvir"].includes(step.modo);
-    if (escolha && !lesson.answered && /^[1-4]$/.test(e.key)) answerChoice(Number(e.key) - 1);
+    if (escolha && !lesson.answered && /^[1-4]$/.test(e.key)) {
+      const i = Number(e.key) - 1;
+      if (!(step.fora && step.fora.includes(i))) answerChoice(i);
+    } else if (step.t === "quiz" && !lesson.answered && e.key === "?") darDica();
     else if (e.key === "Enter" && (step.t !== "quiz" || lesson.answered)) { e.preventDefault(); stopListening(); next(); }
   });
 

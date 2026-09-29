@@ -11,17 +11,19 @@
   --no: #C43D3D;
   --no-bg: #FBE7E7;
   --gold: #D99A00;
+  --hint-bg: #FFF6DC;
+  --hint-ink: #6B4E00;
   --radius: 14px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #12151B; --card: #1B2029; --ink: #E9ECF1; --muted: #9AA3B2; --line: #2E3542;
-    --accent: #6D8DFF; --accent-ink: #0D1020; --ok: #5CCB8A; --ok-bg: #16301F; --no: #FF7B7B; --no-bg: #3A1B1B; --gold: #F2C14E;
+    --accent: #6D8DFF; --accent-ink: #0D1020; --ok: #5CCB8A; --ok-bg: #16301F; --no: #FF7B7B; --no-bg: #3A1B1B; --gold: #F2C14E; --hint-bg: #33290F; --hint-ink: #F2D58A;
   }
 }
 :root[data-theme="dark"] {
   --bg: #12151B; --card: #1B2029; --ink: #E9ECF1; --muted: #9AA3B2; --line: #2E3542;
-  --accent: #6D8DFF; --accent-ink: #0D1020; --ok: #5CCB8A; --ok-bg: #16301F; --no: #FF7B7B; --no-bg: #3A1B1B; --gold: #F2C14E;
+  --accent: #6D8DFF; --accent-ink: #0D1020; --ok: #5CCB8A; --ok-bg: #16301F; --no: #FF7B7B; --no-bg: #3A1B1B; --gold: #F2C14E; --hint-bg: #33290F; --hint-ink: #F2D58A;
 }
 
 * { box-sizing: border-box; }
@@ -177,6 +179,19 @@ main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; outline: none;
 }
 .chips .chip:disabled { opacity: .25; box-shadow: none; }
 .built .chip { border-color: var(--accent); }
+
+.btn.dica { border-color: var(--gold); color: var(--hint-ink); background: var(--card); font-size: 15px; padding: 8px 16px; }
+.dica-box {
+  width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px;
+  background: var(--hint-bg); color: var(--hint-ink); border: 1px solid var(--gold);
+}
+.dica-box p { margin: 0; }
+.dica-box details { margin-top: 10px; color: var(--ink); }
+.dica-box summary { cursor: pointer; font-weight: 600; color: var(--hint-ink); }
+.dica-box .texto { margin-top: 8px; font-size: 15px; }
+.dica-box .texto p { margin: 0 0 10px; }
+.padrao { font: 600 18px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 2px; word-break: break-word; }
+.opt.out { opacity: .25; text-decoration: line-through; }
 
 .mic.on { animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: .6; } }

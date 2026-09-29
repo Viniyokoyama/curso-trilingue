@@ -223,3 +223,29 @@ main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; outline: none;
   .card { padding: 18px; }
   .opts { grid-template-columns: 1fr; }
 }
+
+/* aulas de gramática */
+.aula-card { display: grid; gap: 4px; text-align: left; padding: 16px 18px; width: 100%; }
+.aula-card:hover { border-color: var(--accent); }
+.aula-n { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.sub-h { margin: 18px 0 2px; font-size: 16px; color: var(--muted); }
+.aula h1 { font-size: 26px; margin: 4px 0 10px; }
+.aula .kicker { text-align: left; }
+.aula .objetivo { background: var(--bg); border-radius: 10px; padding: 10px 12px; margin: 0 0 8px; }
+.aula section { margin-top: 22px; }
+.aula h2 { font-size: 19px; margin: 0 0 8px; }
+.aula section p { margin: 0 0 10px; }
+.aula .leitura { color: var(--accent); }
+.tabela { overflow-x: auto; margin: 8px 0 12px; }
+.tabela table { border-collapse: collapse; width: 100%; font-size: 15px; }
+.tabela th, .tabela td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+.tabela th { background: var(--bg); font-weight: 700; }
+.erros { background: var(--no-bg); border-radius: 12px; padding: 12px 16px; }
+.erros h2 { color: var(--no); }
+.erros ul { margin: 0; padding-left: 18px; }
+.erros li { margin: 4px 0; }
+.questao { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+.questao summary { cursor: pointer; font-weight: 600; }
+.questao summary span { color: var(--accent); }
+.questao p { margin: 8px 0 0; color: var(--ok); font-weight: 600; }
+.aula-nav { margin-top: 24px; }

@@ -262,32 +262,78 @@
   // ---------- estado de navegação ----------
   let lang = "en";
   let lesson = null;
+  let aula = null; // { nivel: id do nível, i: índice da aula } quando uma aula de gramática está aberta
   let recognizer = null;
 
   function render() {
     if (lesson) return renderLesson();
+    if (aula) return renderAula();
     renderTrail();
   }
 
-  // Aba Gramática: todas as explicações do nível na língua escolhida, com exemplos em áudio.
+  // Aba Gramática: aulas completas do nível (gram-*.js) e, recolhidos, os resumos das unidades.
+  const aulasDe = (lang, nivelId) => ((window.GRAMATICA || {})[lang] || {})[nivelId] || [];
+
   function gramaticaDoNivel(lv) {
+    const aulas = aulasDe(lang, lv.id);
     const units = lv.units.filter(u => !u.revisao && u.nota[lang]);
-    if (!units.length) return `<p class="muted">Este nível não tem explicações de gramática em ${LANGS[lang].nome.toLowerCase()}.</p>`;
-    return `<div class="gramatica">${units.map(u => {
-      const idx = TRACK[lang].units.indexOf(u);
-      const exemplos = u.itens.slice(0, 3).map(w => {
-        const v = view(w, lang);
-        return `<li><button class="say" data-act="say" data-text="${esc(v.fala)}" aria-label="Ouvir">🔊</button>
-          <span><b lang="${LANGS[lang].attr}">${esc(v.main)}</b>${v.sub && lang !== "en" ? `<small>${esc(v.sub)}</small>` : ""}<small>${esc(w.leitura ? "lê-se " + w.pt : w.pt)}</small></span></li>`;
-      }).join("");
-      return `<details class="card regra">
+    const lista = aulas.map((a, i) => `<button class="card aula-card" data-act="aula" data-nivel="${lv.id}" data-i="${i}">
+        <span class="aula-n">Aula ${i + 1}</span>
+        <b>${esc(a.titulo)}</b>
+        <small class="muted">${esc(a.objetivo)}</small>
+      </button>`).join("");
+    const resumos = units.map(u => `<details class="card regra">
         <summary>${esc(u.titulo)}</summary>
         <div class="texto">${paragraphs(u.nota[lang])}</div>
-        <p class="kicker">Exemplos</p>
-        <ul class="exemplos">${exemplos}</ul>
-        <button class="btn primary" data-act="start" data-idx="${idx}">Praticar esta unidade</button>
-      </details>`;
-    }).join("")}</div>`;
+        <button class="btn" data-act="start" data-idx="${TRACK[lang].units.indexOf(u)}">Praticar esta unidade</button>
+      </details>`).join("");
+    return `<div class="gramatica">
+      ${lista || `<p class="muted">Ainda não há aulas de gramática para este nível.</p>`}
+      ${resumos ? `<h3 class="sub-h">Resumos rápidos das unidades</h3>${resumos}` : ""}
+    </div>`;
+  }
+
+  function exemploHtml([frase, leitura, trad]) {
+    return `<li><button class="say" data-act="say" data-text="${esc(frase)}" aria-label="Ouvir">🔊</button>
+      <span><b lang="${LANGS[lang].attr}">${esc(frase)}</b>${leitura ? `<small class="leitura">${esc(leitura)}</small>` : ""}<small>${esc(trad)}</small></span></li>`;
+  }
+
+  function renderAula() {
+    const aulas = aulasDe(lang, aula.nivel);
+    const a = aulas[aula.i];
+    if (!a) { aula = null; return renderTrail(); }
+    const lv = TRACK[lang].levels.find(l => l.id === aula.nivel);
+    const tabela = t => `<div class="tabela"><table>
+        <thead><tr>${t[0].map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+        <tbody>${t.slice(1).map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table></div>`;
+    $app.innerHTML = `
+      <div class="lesson-top">
+        <button class="link" data-act="fecharaula">← Voltar</button>
+        <span class="muted small">${esc(lv ? lv.nivel : "")} · Aula ${aula.i + 1} de ${aulas.length}</span>
+      </div>
+      <article class="card aula">
+        <p class="kicker">Gramática · ${esc(LANGS[lang].nome)}</p>
+        <h1>${esc(a.titulo)}</h1>
+        <p class="objetivo"><b>Nesta aula:</b> ${esc(a.objetivo)}</p>
+        ${a.secoes.map(sec => `<section>
+          <h2>${esc(sec.t)}</h2>
+          ${sec.texto ? paragraphs(sec.texto) : ""}
+          ${sec.tabela ? tabela(sec.tabela) : ""}
+          ${sec.exemplos ? `<ul class="exemplos">${sec.exemplos.map(exemploHtml).join("")}</ul>` : ""}
+        </section>`).join("")}
+        ${a.erros && a.erros.length ? `<section class="erros"><h2>⚠️ Erros comuns</h2><ul>${a.erros.map(e => `<li>${esc(e)}</li>`).join("")}</ul></section>` : ""}
+        ${a.pratica && a.pratica.length ? `<section class="pratica"><h2>✍️ Pratique</h2>
+          <p class="muted small">Responda de cabeça (ou em voz alta) e depois toque para conferir.</p>
+          ${a.pratica.map((q, k) => `<details class="questao"><summary><span>${k + 1}.</span> ${esc(q.p)}</summary><p>${esc(q.r)}</p></details>`).join("")}
+        </section>` : ""}
+        <div class="row aula-nav">
+          ${aula.i > 0 ? `<button class="btn" data-act="aula" data-nivel="${aula.nivel}" data-i="${aula.i - 1}">← Aula anterior</button>` : ""}
+          ${aula.i + 1 < aulas.length ? `<button class="btn primary" data-act="aula" data-nivel="${aula.nivel}" data-i="${aula.i + 1}">Próxima aula →</button>`
+            : `<button class="btn primary" data-act="fecharaula">Voltar ao nível</button>`}
+        </div>
+      </article>`;
+    window.scrollTo(0, 0);
   }
 
   // Escolha manual da voz, para quando a automática soar estranha.
@@ -857,14 +903,19 @@
     const act = b.dataset.act;
     const step = lesson && lesson.steps[lesson.pos];
     if (act === "lang") {
-      lang = b.dataset.lang; me().lang = lang; persist(); render();
+      lang = b.dataset.lang; me().lang = lang; aula = null; persist(); render();
     } else if (act === "apoio" || act === "fala") {
       settings()[act] = b.checked; persist();
+    } else if (act === "aula") {
+      aula = { nivel: b.dataset.nivel, i: Number(b.dataset.i) }; render();
+    } else if (act === "fecharaula") {
+      aula = null; render();
     } else if (act === "aba") {
       me().aba = b.dataset.aba; persist(); render();
     } else if (act === "testarvoz") {
       speak(FRASE_TESTE[lang], lang);
     } else if (act === "start") {
+      aula = null;
       startLesson(Number(b.dataset.idx));
     } else if (act === "srs") {
       startSrs();

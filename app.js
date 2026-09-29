@@ -269,6 +269,27 @@
     renderTrail();
   }
 
+  // Aba Gramática: todas as explicações do nível na língua escolhida, com exemplos em áudio.
+  function gramaticaDoNivel(lv) {
+    const units = lv.units.filter(u => !u.revisao && u.nota[lang]);
+    if (!units.length) return `<p class="muted">Este nível não tem explicações de gramática em ${LANGS[lang].nome.toLowerCase()}.</p>`;
+    return `<div class="gramatica">${units.map(u => {
+      const idx = TRACK[lang].units.indexOf(u);
+      const exemplos = u.itens.slice(0, 3).map(w => {
+        const v = view(w, lang);
+        return `<li><button class="say" data-act="say" data-text="${esc(v.fala)}" aria-label="Ouvir">🔊</button>
+          <span><b lang="${LANGS[lang].attr}">${esc(v.main)}</b>${v.sub && lang !== "en" ? `<small>${esc(v.sub)}</small>` : ""}<small>${esc(w.leitura ? "lê-se " + w.pt : w.pt)}</small></span></li>`;
+      }).join("");
+      return `<details class="card regra">
+        <summary>${esc(u.titulo)}</summary>
+        <div class="texto">${paragraphs(u.nota[lang])}</div>
+        <p class="kicker">Exemplos</p>
+        <ul class="exemplos">${exemplos}</ul>
+        <button class="btn primary" data-act="start" data-idx="${idx}">Praticar esta unidade</button>
+      </details>`;
+    }).join("")}</div>`;
+  }
+
   // Escolha manual da voz, para quando a automática soar estranha.
   function seletorDeVoz() {
     const lista = vozesDe(lang);
@@ -338,9 +359,18 @@
       }).join("")}
     </nav>`;
 
+    const aba = me().aba === "gramatica" ? "gramatica" : "unidades";
+    const lvSel = t.levels[li];
+    html += `<section class="level"><h2>${esc(lvSel.nivel)}</h2><p class="muted">${esc(lvSel.descricao)}</p>
+      <nav class="abas" role="tablist" aria-label="Conteúdo do nível">
+        <button role="tab" class="aba ${aba === "unidades" ? "on" : ""}" aria-selected="${aba === "unidades"}" data-act="aba" data-aba="unidades">📚 Unidades</button>
+        <button role="tab" class="aba ${aba === "gramatica" ? "on" : ""}" aria-selected="${aba === "gramatica"}" data-act="aba" data-aba="gramatica">📖 Gramática</button>
+      </nav></section>`;
+
     let nextFound = false;
-    [t.levels[li]].forEach(lv => {
-      html += `<section class="level"><h2>${esc(lv.nivel)}</h2><p class="muted">${esc(lv.descricao)}</p>
+    if (aba === "gramatica") html += gramaticaDoNivel(lvSel);
+    else [lvSel].forEach(lv => {
+      html += `<section class="level">
         <ol class="path">`;
       lv.units.forEach(u => {
         const idx = t.units.indexOf(u);
@@ -830,6 +860,8 @@
       lang = b.dataset.lang; me().lang = lang; persist(); render();
     } else if (act === "apoio" || act === "fala") {
       settings()[act] = b.checked; persist();
+    } else if (act === "aba") {
+      me().aba = b.dataset.aba; persist(); render();
     } else if (act === "testarvoz") {
       speak(FRASE_TESTE[lang], lang);
     } else if (act === "start") {

@@ -83,6 +83,19 @@ main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; outline: none;
 .lvl.on small { color: inherit; opacity: .85; }
 .lvl.complete:not(.on) { border-color: var(--ok); }
 .level { margin-top: 20px; }
+.abas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 14px; padding: 4px; background: var(--line); border-radius: 12px; }
+.aba { border: 0; background: transparent; border-radius: 9px; padding: 9px; font-weight: 600; color: var(--muted); }
+.aba.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.gramatica { display: grid; gap: 10px; margin-top: 14px; }
+.regra { padding: 14px 18px; }
+.regra summary { cursor: pointer; font-weight: 700; }
+.regra .texto { margin-top: 12px; }
+.regra .texto p { margin: 0 0 12px; }
+.regra .kicker { margin: 6px 0 8px; text-align: left; }
+.exemplos { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 8px; }
+.exemplos li { display: flex; align-items: center; gap: 10px; }
+.exemplos li > span { display: grid; min-width: 0; }
+.exemplos small { color: var(--muted); }
 .path { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
 .node button {
   width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;

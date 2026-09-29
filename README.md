@@ -10,6 +10,7 @@ Inglês, japonês e chinês dos fundamentos ao C1, **uma palavra de cada vez**, 
 - **Níveis** (CEFR): Fundamentos → A1 → A2 → B1 → B2 → C1. No japonês o C1 equivale mais ou menos ao JLPT N2; no chinês, ao HSK 5.
   - Fundamentos são próprios de cada língua: hiragana e katakana (japonês), tons e pinyin (chinês), sons difíceis (inglês).
   - Do A1 ao C1: vocabulário por tema e unidades de gramática com frases completas.
+- **Aba Gramática**: em cada nível, reúne todas as explicações de gramática da língua escolhida, com exemplos em áudio e um botão para praticar a unidade.
 - **Cada unidade**: explicação de gramática da língua escolhida → item 1 e seus exercícios → item 2 e seus exercícios → … → todos juntos, em duas rodadas.
 - **Exercícios**: significado, escolher a tradução, ouvir, digitar (romaji/kana, pinyin/hanzi, inglês), montar a frase com blocos e falar (reconhecimento de voz, no Chrome).
 - **Dicas**: todo exercício tem um botão 💡 Dica. Na múltipla escolha, tira duas alternativas erradas e dá uma pista; no digitar, mostra a primeira letra de cada palavra e depois a resposta; no montar, coloca o próximo bloco certo; no ouvir e no falar, toca devagar. A dica também dá acesso à explicação de gramática da unidade. Dica não conta como erro.

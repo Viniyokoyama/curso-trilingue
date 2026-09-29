@@ -42,7 +42,6 @@ button:disabled { cursor: default; }
 }
 .brand { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font-weight: 700; }
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); }
-.who { font-weight: 600; }
 
 main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; outline: none; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
@@ -57,17 +56,7 @@ main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; outline: none;
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 
-/* login */
-.login form { display: grid; gap: 14px; margin-top: 16px; }
-.login label { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
-.login input {
-  font: inherit; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--bg); color: var(--ink);
-}
-.error { color: var(--no); margin: 0; min-height: 1.5em; }
-.profiles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.profile { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 6px 14px 6px 6px; }
-.avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.error { color: var(--no); margin: 0; }
 
 /* trilha */
 .langs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -81,7 +70,17 @@ main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; outline: none;
 .bar { height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 14px 0; flex: 1; }
 .bar i { display: block; height: 100%; background: var(--ok); transition: width .3s; }
 
-.level { margin-top: 28px; }
+.levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 20px; }
+.lvl {
+  min-width: 0; display: grid; justify-items: center; gap: 0; padding: 8px 4px;
+  border: 2px solid var(--line); background: var(--card); border-radius: 12px;
+}
+.lvl b { font-size: 14px; white-space: nowrap; }
+.lvl small { color: var(--muted); font-size: 12px; }
+.lvl.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.lvl.on small { color: inherit; opacity: .85; }
+.lvl.complete:not(.on) { border-color: var(--ok); }
+.level { margin-top: 20px; }
 .path { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
 .node button {
   width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;

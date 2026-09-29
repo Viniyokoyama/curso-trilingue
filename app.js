@@ -2,7 +2,6 @@
   "use strict";
 
   const $app = document.getElementById("app");
-  const $user = document.getElementById("user");
 
   // ---------- línguas ----------
   const LANGS = {
@@ -81,13 +80,6 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* sem armazenamento: segue sem salvar */ }
   }
 
-  // Hash simples para não guardar o PIN em texto puro (não é segurança forte: os dados ficam neste aparelho).
-  function hash(s) {
-    let h = 5381;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-    return h.toString(36);
-  }
-
   function lev(a, b) {
     const m = a.length, n = b.length;
     if (!m || !n) return m + n;
@@ -157,16 +149,17 @@
     speechSynthesis.speak(u);
   }
 
-  // ---------- contas ----------
-  const USERS_KEY = "trilha.users";
-  const CURRENT_KEY = "trilha.current";
-  let users = load(USERS_KEY, {});
-  let current = load(CURRENT_KEY, null);
-  if (current && !users[current]) current = null;
-
-  const me = () => users[current];
-  const persist = () => save(USERS_KEY, users);
-  const keyOf = nome => nome.trim().toLowerCase();
+  // ---------- progresso (salvo neste aparelho) ----------
+  const PERFIL_KEY = "trilha.perfil";
+  let perfil = load(PERFIL_KEY, null);
+  if (!perfil) {
+    // Traz o progresso da versão com login: a conta usada por último, ou a primeira.
+    const users = load("trilha.users", {});
+    const antigo = users[load("trilha.current", "")] || Object.values(users)[0];
+    perfil = antigo ? { progresso: antigo.progresso, srs: antigo.srs, ajustes: antigo.ajustes, lang: antigo.lang } : {};
+  }
+  const me = () => perfil;
+  const persist = () => save(PERFIL_KEY, perfil);
 
   function progressOf(lang) {
     const u = me();
@@ -185,14 +178,16 @@
   }
   const dueItems = lang => Object.entries(srsOf(lang)).filter(([k, s]) => s.d <= today() && ITEMS.has(k)).sort((a, b) => a[1].d - b[1].d).map(([k]) => ITEMS.get(k));
 
-  // Uma unidade abre quando a anterior foi feita. Passar no teste de um nível abre o nível inteiro
-  // (e todos os anteriores) e a primeira unidade do seguinte.
+  // Todos os níveis ficam abertos. Dentro de um nível, cada unidade abre quando a anterior foi feita.
   function isOpen(lang, idx) {
-    const t = TRACK[lang], u = t.units[idx], prog = progressOf(lang);
-    if (idx === 0 || prog[t.units[idx - 1].id]) return true;
-    const pulo = prog._pulo ?? -1;
-    const li = t.levels.findIndex(l => l.units.includes(u));
-    return li <= pulo || (li === pulo + 1 && t.levels[li].units[0] === u);
+    const t = TRACK[lang], u = t.units[idx];
+    return idx === 0 || t.units[idx - 1].nivel !== u.nivel || !!progressOf(lang)[t.units[idx - 1].id];
+  }
+  const levelOf = (lang, unit) => TRACK[lang].levels.findIndex(l => l.units.includes(unit));
+  function selectedLevel() {
+    const sel = (me().nivel = me().nivel || {});
+    const t = TRACK[lang];
+    return Math.min(sel[lang] ?? 0, t.levels.length - 1);
   }
 
   // ---------- estado de navegação ----------
@@ -200,57 +195,9 @@
   let lesson = null;
   let recognizer = null;
 
-  function renderUser() {
-    if (!current) { $user.innerHTML = ""; return; }
-    $user.innerHTML = `<span class="who">${esc(me().nome)}</span> <button class="link" data-act="logout">Sair</button>`;
-  }
-
   function render() {
-    renderUser();
-    if (!current) return renderLogin();
     if (lesson) return renderLesson();
     renderTrail();
-  }
-
-  // ---------- login ----------
-  function renderLogin(msg = "") {
-    const nomes = Object.values(users);
-    $app.innerHTML = `
-      <section class="card login">
-        <h1>Entrar</h1>
-        <p class="muted">Cada pessoa tem a sua própria trilha em inglês, japonês e chinês.</p>
-        ${nomes.length ? `
-          <div class="profiles">
-            ${nomes.map(u => `<button class="profile" data-act="pick" data-key="${esc(keyOf(u.nome))}">
-              <span class="avatar">${esc(u.nome.slice(0, 1).toUpperCase())}</span>${esc(u.nome)}</button>`).join("")}
-          </div>` : ""}
-        <form id="login-form" autocomplete="off">
-          <label>Nome <input name="nome" required maxlength="30" placeholder="Seu nome"></label>
-          <label>PIN (4 números) <input name="pin" required inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="••••"></label>
-          <p class="error" role="alert">${esc(msg)}</p>
-          <button class="btn primary" type="submit">Entrar ou criar conta</button>
-        </form>
-        <p class="muted small">Se o nome ainda não existe, a conta é criada com esse PIN. O progresso fica salvo neste aparelho.</p>
-      </section>`;
-    const form = document.getElementById("login-form");
-    form.addEventListener("submit", e => {
-      e.preventDefault();
-      const nome = form.nome.value.trim();
-      const pin = form.pin.value.trim();
-      if (!nome) return renderLogin("Digite um nome.");
-      if (!/^\d{4}$/.test(pin)) return renderLogin("O PIN precisa ter 4 números.");
-      const k = keyOf(nome);
-      if (users[k]) {
-        if (users[k].pin !== hash(pin)) return renderLogin(`PIN errado para ${users[k].nome}.`);
-      } else {
-        users[k] = { nome, pin: hash(pin), progresso: {} };
-        persist();
-      }
-      current = k;
-      save(CURRENT_KEY, current);
-      lang = me().lang || "en";
-      render();
-    });
   }
 
   // ---------- trilha ----------
@@ -286,11 +233,18 @@
         <label><input type="checkbox" data-act="fala" ${aj.fala && SR ? "checked" : ""} ${SR ? "" : "disabled"}> Exercícios de fala (microfone)${SR ? "" : " · este navegador não reconhece voz; use o Chrome"}</label>
       </details>`;
 
+    const li = selectedLevel();
+    html += `<nav class="levels" aria-label="Nível">
+      ${t.levels.map((lv, i) => {
+        const n = lv.units.filter(u => prog[u.id]).length;
+        return `<button class="lvl ${i === li ? "on" : ""} ${n === lv.units.length ? "complete" : ""}" data-act="nivel" data-level="${i}" aria-pressed="${i === li}">
+          <b>${esc(lv.nivel.split(" · ")[0])}</b><small>${n}/${lv.units.length}</small></button>`;
+      }).join("")}
+    </nav>`;
+
     let nextFound = false;
-    t.levels.forEach((lv, li) => {
-      const locked = lv.units.some(u => !isOpen(lang, t.units.indexOf(u)));
+    [t.levels[li]].forEach(lv => {
       html += `<section class="level"><h2>${esc(lv.nivel)}</h2><p class="muted">${esc(lv.descricao)}</p>
-        ${locked ? `<button class="btn skip" data-act="teste" data-level="${li}">Já sei isso · fazer teste para pular</button>` : ""}
         <ol class="path">`;
       lv.units.forEach(u => {
         const idx = t.units.indexOf(u);
@@ -314,7 +268,7 @@
     html += `
       <details class="card about">
         <summary>Como este curso leva à fluência</summary>
-        <p><b>Fundamentos → A1 → A2 → B1 → B2 → C1.</b> Os níveis seguem o Quadro Europeu (CEFR). No japonês, o C1 corresponde mais ou menos ao JLPT N2; no chinês, ao HSK 5.</p>
+        <p><b>Fundamentos → A1 → A2 → B1 → B2 → C1.</b> Comece pelo nível que combina com você: todos estão abertos, e dentro de cada nível as unidades seguem em ordem. Os níveis seguem o Quadro Europeu (CEFR). No japonês, o C1 corresponde mais ou menos ao JLPT N2; no chinês, ao HSK 5.</p>
         <p><b>Cada unidade</b> apresenta uma palavra ou frase por vez, pratica cada uma e termina com todas juntas, em cinco tipos de exercício: significado, escolher, ouvir, digitar, montar a frase e falar.</p>
         <p><b>A revisão espaçada</b> traz de volta o que você aprendeu no momento em que você ia esquecer: 1 dia, 2, 4, 7, 14, 30, 60, 120. Quem revisa sempre não perde o que aprendeu.</p>
         <p><b>Fluência de verdade pede conversa.</b> A trilha dá a base de vocabulário, gramática e pronúncia. Junte a ela conversa com nativos (italki, HelloTalk, Tandem), séries com legenda na própria língua e leitura. Fale em voz alta sempre que o exercício mostrar uma frase.</p>
@@ -342,6 +296,8 @@
 
   function startLesson(idx) {
     const unit = TRACK[lang].units[idx];
+    me().nivel = { ...me().nivel, [lang]: levelOf(lang, unit) };
+    persist();
     lesson = { tipo: unit.revisao ? "revisao" : "unidade", idx, unit, steps: [], pos: 0, erros: 0, answered: null };
     const steps = lesson.steps;
     if (unit.nota[lang]) steps.push({ t: "nota" });
@@ -368,15 +324,6 @@
     if (!itens.length) return;
     lesson = { tipo: "srs", unit: { titulo: "Revisão", itens }, steps: [], pos: 0, erros: 0, answered: null };
     lesson.steps.push(...shuffle(itens).map(w => ({ ...quiz(w, "final"), primeira: true })));
-    render();
-  }
-
-  function startTeste(li) {
-    const lv = TRACK[lang].levels[li];
-    const itens = [...new Set(lv.units.filter(u => !u.revisao).flatMap(u => u.itens))];
-    lesson = { tipo: "teste", li, unit: { titulo: `Teste · ${lv.nivel}`, itens }, steps: [], pos: 0, erros: 0, answered: null };
-    lesson.steps.push({ t: "intro", titulo: `Teste para pular: ${lv.nivel}`, texto: "15 perguntas do nível inteiro. Com até 3 erros, o nível todo fica liberado e você pode seguir para o próximo." });
-    pick(itens, 15).forEach(w => lesson.steps.push({ ...quiz(w, "final"), teste: true }));
     render();
   }
 
@@ -574,7 +521,7 @@
     lesson.answered = { ok, ...extra };
     if (!ok) {
       lesson.erros++;
-      if (step.fase === "final" && !step.teste) lesson.steps.push({ t: "quiz", w: step.w, fase: "final", modo: step.modo });
+      if (step.fase === "final") lesson.steps.push({ t: "quiz", w: step.w, fase: "final", modo: step.modo });
     }
     if (lesson.tipo === "srs" && step.primeira) updateSrs(step.w, ok);
     if (ok && !extra.pulou) speak(view(step.w, lang).fala, lang);
@@ -645,18 +592,7 @@
     const L = lesson;
     const e = L.erros;
     let html;
-    if (L.tipo === "teste") {
-      const passou = e <= 3;
-      if (passou) {
-        const prog = progressOf(lang);
-        prog._pulo = Math.max(prog._pulo ?? -1, L.li);
-        persist();
-      }
-      html = `<p class="kicker">${passou ? "Aprovado" : "Ainda não"}</p>
-        <h2>${esc(L.unit.titulo)}</h2>
-        <p class="muted">${e} erro${e === 1 ? "" : "s"} em 15. ${passou ? "O nível está liberado. Faça as unidades que quiser e siga para o próximo." : "Com até 3 erros o nível é liberado. Vale fazer as unidades: elas vão rápido para quem já sabe."}</p>
-        <div class="row"><button class="btn primary" data-act="quit">Voltar à trilha</button></div>`;
-    } else if (L.tipo === "srs") {
+    if (L.tipo === "srs") {
       const total = L.unit.itens.length;
       html = `<p class="kicker">Revisão concluída</p>
         <h2>${total - Math.min(e, total)} de ${total} de primeira</h2>
@@ -697,13 +633,7 @@
     if (!b || b.disabled) return;
     const act = b.dataset.act;
     const step = lesson && lesson.steps[lesson.pos];
-    if (act === "pick") {
-      const form = document.getElementById("login-form");
-      form.nome.value = users[b.dataset.key].nome;
-      form.pin.focus();
-    } else if (act === "logout") {
-      current = null; lesson = null; save(CURRENT_KEY, null); render();
-    } else if (act === "lang") {
+    if (act === "lang") {
       lang = b.dataset.lang; me().lang = lang; persist(); render();
     } else if (act === "apoio" || act === "fala") {
       settings()[act] = b.checked; persist();
@@ -711,8 +641,9 @@
       startLesson(Number(b.dataset.idx));
     } else if (act === "srs") {
       startSrs();
-    } else if (act === "teste") {
-      startTeste(Number(b.dataset.level));
+    } else if (act === "nivel") {
+      me().nivel = { ...me().nivel, [lang]: Number(b.dataset.level) }; persist(); render();
+      window.scrollTo(0, 0);
     } else if (act === "quit") {
       stopListening(); lesson = null; render();
     } else if (act === "say") {
@@ -763,6 +694,6 @@
     window.__trilha = { step: () => lesson && lesson.steps[lesson.pos], view: w => view(w, lang), tokens: w => tokens(w, lang) };
   }
 
-  if (current) lang = me().lang || "en";
+  lang = me().lang || "en";
   render();
 })();

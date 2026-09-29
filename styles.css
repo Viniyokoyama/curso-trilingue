@@ -134,6 +134,54 @@ main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; outline: none;
 .recap .word .main { font-size: 20px; }
 .recap li > span { color: var(--muted); text-align: right; }
 
+/* revisão, ajustes e textos */
+.review { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; margin-top: 4px; }
+.review > div { display: grid; }
+.settings, .about { margin-top: 12px; padding: 14px 18px; }
+.settings summary, .about summary { cursor: pointer; font-weight: 600; }
+.settings label { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+.settings input { width: 18px; height: 18px; accent-color: var(--accent); }
+.about { margin-top: 32px; }
+.about p { margin: 12px 0 0; }
+.btn.skip { margin-top: 8px; font-size: 14px; padding: 8px 14px; }
+.nota .texto { text-align: left; width: 100%; }
+.nota .texto p { margin: 0 0 12px; }
+
+/* exercícios */
+.opt { position: relative; }
+.opt kbd { position: absolute; top: 6px; left: 8px; font: 600 11px/1 "Instrument Sans", sans-serif; color: var(--muted); }
+.opts.frases { grid-template-columns: 1fr; }
+.opts.frases .opt .main { font-size: 17px; }
+.word.frase .main { font-size: clamp(22px, 6vw, 30px); }
+.word.big.frase .main { font-size: clamp(24px, 6.5vw, 34px); }
+
+.typing { width: 100%; display: flex; flex-wrap: wrap; gap: 10px; }
+.typing .btn { flex: 1 0 auto; }
+.typing input {
+  flex: 1 1 200px; min-width: 0; font: inherit; font-size: 18px; padding: 12px 14px; border-radius: 12px;
+  border: 2px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.typing input:focus { outline: none; border-color: var(--accent); }
+
+.built {
+  width: 100%; min-height: 64px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center;
+  padding: 10px; border: 2px dashed var(--line); border-radius: 12px;
+}
+.built.ok { border-color: var(--ok); border-style: solid; }
+.built.no { border-color: var(--no); border-style: solid; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip {
+  border: 2px solid var(--line); background: var(--card); border-radius: 10px; padding: 8px 12px;
+  font-size: 18px; font-weight: 600; box-shadow: 0 2px 0 var(--line);
+}
+.chips .chip:disabled { opacity: .25; box-shadow: none; }
+.built .chip { border-color: var(--accent); }
+
+.mic.on { animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .6; } }
+.heard { margin: 0; color: var(--muted); }
+.heard.ok { color: var(--ok); }
+
 @media (max-width: 480px) {
   .card { padding: 18px; }
   .opts { grid-template-columns: 1fr; }

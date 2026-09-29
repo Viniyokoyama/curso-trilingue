@@ -50,12 +50,32 @@
     TRACK[lang] = { levels, units, pool };
   }
 
+  // Texto que vai para a voz do navegador.
+  // Japonês: símbolos do silabário vão em katakana; palavras soltas vão em kana (sem ambiguidade de leitura). Frases vão com kanji, porque em kana
+  // puro a voz lê a partícula は como "ha" e へ como "he"; os kanji com mais de uma leitura viram kana,
+  // conforme o romaji do item (家 → いえ e não うち, 七時 → しちじ e não ななじ…).
+  const LEITURAS = [
+    ["二十歳", "はたち", /hatachi/], ["七時", "しちじ", /shichiji/], ["九時", "くじ", /kuji/], ["一日", "いちにち", /ichinichi/],
+    ["明日", "あした", /ashita/], ["昨日", "きのう", /kinō/], ["今日", "きょう", /kyō/], ["私", "わたし", /watashi/],
+    ["家", "いえ", /\bie\b/], ["二人", "ふたり", /futari/], ["年上", "としうえ", /toshiue/], ["何歳", "なんさい", /nansai/],
+  ];
+  // Símbolos soltos vão em katakana: は sozinho pode ser lido como a partícula "wa", ハ é sempre "ha".
+  const katakana = s => s.replace(/[\u3041-\u3096]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  function falaJp(item) {
+    if (item.leitura) return katakana(item.jkana);
+    if (!item.frase) return item.jkana;
+    let t = clean(item.jk);
+    for (const [k, kana, re] of LEITURAS) if (re.test(item.jr)) t = t.split(k).join(kana);
+    return t;
+  }
+  const falaEn = item => item.en.replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+
   // Como um item aparece em cada língua.
   function view(item, lang) {
-    if (lang === "en") return { main: item.en, sub: "", fala: item.en };
+    if (lang === "en") return { main: item.en, sub: "", fala: falaEn(item) };
     if (lang === "jp") {
       const main = clean(item.jk);
-      return { main, sub: main === item.jkana ? item.jr : `${item.jkana} · ${item.jr}`, fala: item.jkana };
+      return { main, sub: main === item.jkana ? item.jr : `${item.jkana} · ${item.jr}`, fala: falaJp(item) };
     }
     return { main: clean(item.zh), sub: item.py, fala: clean(item.zh) };
   }
@@ -137,12 +157,30 @@
   // ---------- áudio ----------
   let voices = [];
   function loadVoices() { try { voices = speechSynthesis.getVoices(); } catch { voices = []; } }
-  if ("speechSynthesis" in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+  if ("speechSynthesis" in window) {
+    loadVoices();
+    // As vozes chegam depois do carregamento em vários navegadores: atualiza o aviso de voz ausente.
+    speechSynthesis.onvoiceschanged = () => { loadVoices(); if (!lesson) render(); };
+  }
+  // Escolhe a voz certa: mandarim da China continental primeiro, nunca cantonês (zh-HK / yue).
+  const VOZES = {
+    en: [/^en-us$/, /^en-gb$/, /^en(-|$)/],
+    jp: [/^ja-jp$/, /^ja(-|$)/, /^jpn/],
+    zh: [/^zh-cn$/, /^cmn-(hans-)?cn$/, /^zh-hans/, /^cmn/, /^zh-sg$/, /^zh-tw$/, /^zh$/],
+  };
+  function voiceFor(lang) {
+    const norm = v => v.lang.replace(/_/g, "-").toLowerCase();
+    for (const re of VOZES[lang]) {
+      const found = voices.filter(v => re.test(norm(v)));
+      if (found.length) return found.find(v => /google|premium|enhanced|natural/i.test(v.name)) || found[0];
+    }
+    return null;
+  }
   function speak(text, lang, rate = 0.85) {
     if (!("speechSynthesis" in window)) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = LANGS[lang].voz;
-    const v = voices.find(v => v.lang.replace("_", "-") === u.lang) || voices.find(v => v.lang.startsWith(u.lang.slice(0, 2)));
+    const v = voiceFor(lang);
     if (v) u.voice = v;
     u.rate = rate;
     speechSynthesis.cancel();
@@ -197,6 +235,10 @@
     renderTrail();
   }
 
+  // Só avisa quando o navegador já listou as vozes e nenhuma é da língua escolhida.
+  const semVoz = lang => "speechSynthesis" in window && voices.length > 0 && !voiceFor(lang);
+  const COMO_INSTALAR = "No Android: Configurações → Acessibilidade → Saída de conversão de texto em voz → Mecanismo do Google → instale os dados de voz. No iPhone: Ajustes → Acessibilidade → Conteúdo Falado → Vozes. No computador, use o Chrome, que já traz vozes do Google.";
+
   // ---------- trilha ----------
   function renderTrail() {
     const t = TRACK[lang];
@@ -217,6 +259,10 @@
         }).join("")}
       </nav>
       <div class="bar" aria-label="Progresso"><i style="width:${(feitas / t.units.length) * 100}%"></i></div>
+      ${semVoz(lang) ? `<section class="card aviso" role="note">
+        <b>Seu aparelho não tem voz em ${LANGS[lang].nome.toLowerCase()} instalada.</b>
+        <p>Sem ela, o áudio sai com sotaque errado. ${COMO_INSTALAR}</p>
+      </section>` : ""}
       <section class="card review">
         <div>
           <b>${aprendidas} ${aprendidas === 1 ? "item aprendido" : "itens aprendidos"}</b>
@@ -331,6 +377,8 @@
     const out = [];
     const ok = x => {
       if (x === w || x.pt === w.pt) return false;
+      if (w.leitura && x.jr === w.jr) return false; // あ e ア, お e を: mesmo som
+      if (w.leitura && out.some(o => o.jr === x.jr)) return false;
       const vx = view(x, lang);
       if (vx.main === vw.main || vx.fala === vw.fala) return false;
       return !out.some(o => o.pt === x.pt || view(o, lang).main === vx.main || view(o, lang).fala === vx.fala);

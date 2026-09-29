@@ -134,6 +134,8 @@ main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; outline: none;
 .recap li > span { color: var(--muted); text-align: right; }
 
 /* revisão, ajustes e textos */
+.aviso { margin-top: 4px; padding: 14px 18px; border-color: var(--gold); }
+.aviso p { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
 .review { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; margin-top: 4px; }
 .review > div { display: grid; }
 .settings, .about { margin-top: 12px; padding: 14px 18px; }

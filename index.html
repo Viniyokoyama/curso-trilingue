@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Curso Trilíngue 365</title>
-  <meta name="description" content="Inglês, japonês, chinês e espanhol em 365 dias: cada palavra nova entra nas quatro línguas ao mesmo tempo.">
+  <title>Trilha Trilíngue</title>
+  <meta name="description" content="Inglês, japonês e chinês do básico ao avançado, uma palavra de cada vez.">
   <meta name="theme-color" content="#EEF0F3">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.88em' font-size='88'>%E8%AA%9E</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,29 +13,17 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <a class="skip" href="#app">Pular para o conteúdo</a>
   <header class="top">
-    <a class="brand" href="#hoje">
+    <a class="brand" href="#">
       <span class="brand-mark" lang="ja" aria-hidden="true">語</span>
-      <span class="brand-name">Curso Trilíngue 365</span>
+      <span class="brand-name">Trilha Trilíngue</span>
     </a>
-    <nav class="tabs" aria-label="Seções do curso">
-      <a href="#hoje" data-view="hoje">Hoje</a>
-      <a href="#metodo" data-view="metodo">Método</a>
-      <a href="#plano" data-view="plano">52 semanas</a>
-      <a href="#mes1" data-view="mes1">Mês 1</a>
-      <a href="#vocab" data-view="vocab">Vocabulário</a>
-    </nav>
+    <div id="user"></div>
   </header>
 
   <main id="app" tabindex="-1"></main>
-  <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="data-metodo.js"></script>
-  <script src="data-plano.js"></script>
-  <script src="data-vocab.js"></script>
-  <script src="data-licoes.js"></script>
-  <script src="data-quiz.js"></script>
+  <script src="data-trilha.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

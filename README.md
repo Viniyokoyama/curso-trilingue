@@ -6,7 +6,7 @@ Inglês, japonês e chinês dos fundamentos ao C1, **uma palavra de cada vez**, 
 
 - **Sem login**: o progresso fica salvo no navegador deste aparelho.
 - **Uma língua por vez**: escolha Inglês, Japonês ou Chinês no topo. Cada língua tem o seu progresso.
-- **Escolha o nível**: todos os níveis ficam abertos; escolha o seu nos botões acima da trilha. Dentro de cada nível, as unidades seguem em ordem.
+- **Escolha o nível**: tudo fica aberto, sem cadeados; escolha o nível nos botões acima da trilha e qualquer unidade dentro dele.
 - **Níveis** (CEFR): Fundamentos → A1 → A2 → B1 → B2 → C1. No japonês o C1 equivale mais ou menos ao JLPT N2; no chinês, ao HSK 5.
   - Fundamentos são próprios de cada língua: hiragana e katakana (japonês), tons e pinyin (chinês), sons difíceis (inglês).
   - Do A1 ao C1: vocabulário por tema e unidades de gramática com frases completas.

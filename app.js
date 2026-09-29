@@ -178,11 +178,8 @@
   }
   const dueItems = lang => Object.entries(srsOf(lang)).filter(([k, s]) => s.d <= today() && ITEMS.has(k)).sort((a, b) => a[1].d - b[1].d).map(([k]) => ITEMS.get(k));
 
-  // Todos os níveis ficam abertos. Dentro de um nível, cada unidade abre quando a anterior foi feita.
-  function isOpen(lang, idx) {
-    const t = TRACK[lang], u = t.units[idx];
-    return idx === 0 || t.units[idx - 1].nivel !== u.nivel || !!progressOf(lang)[t.units[idx - 1].id];
-  }
+  // Tudo aberto: qualquer unidade pode ser feita a qualquer momento.
+  const isOpen = () => true;
   const levelOf = (lang, unit) => TRACK[lang].levels.findIndex(l => l.units.includes(unit));
   function selectedLevel() {
     const sel = (me().nivel = me().nivel || {});
@@ -268,7 +265,7 @@
     html += `
       <details class="card about">
         <summary>Como este curso leva à fluência</summary>
-        <p><b>Fundamentos → A1 → A2 → B1 → B2 → C1.</b> Comece pelo nível que combina com você: todos estão abertos, e dentro de cada nível as unidades seguem em ordem. Os níveis seguem o Quadro Europeu (CEFR). No japonês, o C1 corresponde mais ou menos ao JLPT N2; no chinês, ao HSK 5.</p>
+        <p><b>Fundamentos → A1 → A2 → B1 → B2 → C1.</b> Tudo está aberto: escolha o nível e a unidade que quiser. A ordem sugerida é de cima para baixo. Os níveis seguem o Quadro Europeu (CEFR). No japonês, o C1 corresponde mais ou menos ao JLPT N2; no chinês, ao HSK 5.</p>
         <p><b>Cada unidade</b> apresenta uma palavra ou frase por vez, pratica cada uma e termina com todas juntas, em cinco tipos de exercício: significado, escolher, ouvir, digitar, montar a frase e falar.</p>
         <p><b>A revisão espaçada</b> traz de volta o que você aprendeu no momento em que você ia esquecer: 1 dia, 2, 4, 7, 14, 30, 60, 120. Quem revisa sempre não perde o que aprendeu.</p>
         <p><b>Fluência de verdade pede conversa.</b> A trilha dá a base de vocabulário, gramática e pronúncia. Junte a ela conversa com nativos (italki, HelloTalk, Tandem), séries com legenda na própria língua e leitura. Fale em voz alta sempre que o exercício mostrar uma frase.</p>

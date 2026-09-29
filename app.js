@@ -156,28 +156,48 @@
 
   // ---------- áudio ----------
   let voices = [];
+  let pendente = null, pendenteTimer = 0;
   function loadVoices() { try { voices = speechSynthesis.getVoices(); } catch { voices = []; } }
   if ("speechSynthesis" in window) {
     loadVoices();
-    // As vozes chegam depois do carregamento em vários navegadores: atualiza o aviso de voz ausente.
-    speechSynthesis.onvoiceschanged = () => { loadVoices(); if (!lesson) render(); };
+    // As vozes chegam depois do carregamento em vários navegadores.
+    speechSynthesis.onvoiceschanged = () => {
+      loadVoices();
+      if (pendente) { const p = pendente; pendente = null; falarAgora(p.text, p.lang, p.rate); }
+      if (!lesson) render();
+    };
   }
-  // Escolhe a voz certa: mandarim da China continental primeiro, nunca cantonês (zh-HK / yue).
+
+  // Regiões aceitas para cada língua, em ordem de preferência. Chinês: mandarim, nunca cantonês (zh-HK / yue).
   const VOZES = {
     en: [/^en-us$/, /^en-gb$/, /^en(-|$)/],
     jp: [/^ja-jp$/, /^ja(-|$)/, /^jpn/],
     zh: [/^zh-cn$/, /^cmn-(hans-)?cn$/, /^zh-hans/, /^cmn/, /^zh-sg$/, /^zh-tw$/, /^zh$/],
   };
-  function voiceFor(lang) {
-    const norm = v => v.lang.replace(/_/g, "-").toLowerCase();
-    for (const re of VOZES[lang]) {
-      const found = voices.filter(v => re.test(norm(v)));
-      if (found.length) return found.find(v => /google|premium|enhanced|natural/i.test(v.name)) || found[0];
-    }
-    return null;
+  // iPhone e Mac trazem vozes de brincadeira (Albert, Bubbles, Zarvox…) e vozes robóticas (Eddy, Flo,
+  // Grandma, Reed…) na mesma lista das vozes normais. Elas ficam por último.
+  const VOZ_RUIM = /\b(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|kathy|fred|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i;
+  const VOZ_BOA = /google|siri|samantha|alex|ava|allison|susan|zoe|nicky|aaron|daniel|karen|moira|tessa|serena|aria|jenny|guy|zira|kyoko|otoya|o-ren|hattori|nanami|haruka|ayumi|ichiro|sayaka|keita|ting-?ting|mei-?jia|li-mu|lili|yu-shu|xiaoxiao|yunxi|huihui|kangkang|yaoyao/i;
+  const VOZ_PREMIUM = /premium|enhanced|natural|neural/i;
+  const vozId = v => v.voiceURI || v.name;
+
+  // Vozes da língua, da melhor para a pior.
+  function vozesDe(lang) {
+    const norm = v => (v.lang || "").replace(/_/g, "-").toLowerCase();
+    const nota = (v, tier) => -tier * 10 + (VOZ_RUIM.test(v.name) ? -100 : 0) + (VOZ_BOA.test(v.name) ? 5 : 0) + (VOZ_PREMIUM.test(v.name) ? 3 : 0);
+    return voices
+      .map(v => ({ v, tier: VOZES[lang].findIndex(re => re.test(norm(v))) }))
+      .filter(x => x.tier >= 0)
+      .sort((a, b) => nota(b.v, b.tier) - nota(a.v, a.tier))
+      .map(x => x.v);
   }
-  function speak(text, lang, rate = 0.85) {
-    if (!("speechSynthesis" in window)) return;
+  function voiceFor(lang) {
+    const lista = vozesDe(lang);
+    const escolhida = (settings().voz || {})[lang];
+    return lista.find(v => vozId(v) === escolhida) || lista[0] || null;
+  }
+
+  function falarAgora(text, lang, rate) {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = LANGS[lang].voz;
     const v = voiceFor(lang);
@@ -186,6 +206,20 @@
     speechSynthesis.cancel();
     speechSynthesis.speak(u);
   }
+  function speak(text, lang, rate = 0.85) {
+    if (!("speechSynthesis" in window)) return;
+    if (!voices.length) loadVoices();
+    if (!voices.length) {
+      // Sem a lista de vozes, o Chrome do Android ignora o idioma e lê com a voz em português
+      // ("think" vira "tinqui"). Espera a lista chegar, por no máximo 1,5 s.
+      pendente = { text, lang, rate };
+      clearTimeout(pendenteTimer);
+      pendenteTimer = setTimeout(() => { if (pendente) { const p = pendente; pendente = null; falarAgora(p.text, p.lang, p.rate); } }, 1500);
+      return;
+    }
+    falarAgora(text, lang, rate);
+  }
+  const FRASE_TESTE = { en: "Hello! I think this is a good day.", jp: "こんにちは。わたしは学生です。", zh: "你好！我是学生。" };
 
   // ---------- progresso (salvo neste aparelho) ----------
   const PERFIL_KEY = "trilha.perfil";
@@ -235,6 +269,24 @@
     renderTrail();
   }
 
+  // Escolha manual da voz, para quando a automática soar estranha.
+  function seletorDeVoz() {
+    const lista = vozesDe(lang);
+    if (lista.length < 2) return "";
+    const atual = voiceFor(lang);
+    const nome = LANGS[lang].nome.toLowerCase();
+    return `<div class="voz">
+        <label for="voz-sel">Voz em ${nome}</label>
+        <div class="voz-row">
+          <select id="voz-sel" data-act="voz">
+            ${lista.map((v, i) => `<option value="${esc(vozId(v))}" ${atual && vozId(v) === vozId(atual) ? "selected" : ""}>${esc(v.name)}${i === 0 ? " (recomendada)" : ""}</option>`).join("")}
+          </select>
+          <button class="btn" data-act="testarvoz">▶ Testar</button>
+        </div>
+        <small class="muted">Se o áudio soar estranho ou robótico, troque aqui e toque em Testar.</small>
+      </div>`;
+  }
+
   // Só avisa quando o navegador já listou as vozes e nenhuma é da língua escolhida.
   const semVoz = lang => "speechSynthesis" in window && voices.length > 0 && !voiceFor(lang);
   const COMO_INSTALAR = "No Android: Configurações → Acessibilidade → Saída de conversão de texto em voz → Mecanismo do Google → instale os dados de voz. No iPhone: Ajustes → Acessibilidade → Conteúdo Falado → Vozes. No computador, use o Chrome, que já traz vozes do Google.";
@@ -274,6 +326,7 @@
         <summary>Ajustes</summary>
         ${lang !== "en" ? `<label><input type="checkbox" data-act="apoio" ${aj.apoio ? "checked" : ""}> Mostrar ${lang === "jp" ? "kana e romaji" : "pinyin"} nos exercícios</label>` : ""}
         <label><input type="checkbox" data-act="fala" ${aj.fala && SR ? "checked" : ""} ${SR ? "" : "disabled"}> Exercícios de fala (microfone)${SR ? "" : " · este navegador não reconhece voz; use o Chrome"}</label>
+        ${seletorDeVoz()}
       </details>`;
 
     const li = selectedLevel();
@@ -777,6 +830,8 @@
       lang = b.dataset.lang; me().lang = lang; persist(); render();
     } else if (act === "apoio" || act === "fala") {
       settings()[act] = b.checked; persist();
+    } else if (act === "testarvoz") {
+      speak(FRASE_TESTE[lang], lang);
     } else if (act === "start") {
       startLesson(Number(b.dataset.idx));
     } else if (act === "srs") {
@@ -809,6 +864,14 @@
     } else if (act === "next") {
       stopListening(); next();
     }
+  });
+
+  document.addEventListener("change", e => {
+    if (e.target.dataset.act !== "voz") return;
+    const aj = settings();
+    aj.voz = { ...aj.voz, [lang]: e.target.value };
+    persist();
+    speak(FRASE_TESTE[lang], lang);
   });
 
   document.addEventListener("submit", e => {

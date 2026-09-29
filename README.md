@@ -14,7 +14,7 @@ Inglês, japonês e chinês dos fundamentos ao C1, **uma palavra de cada vez**, 
 - **Exercícios**: significado, escolher a tradução, ouvir, digitar (romaji/kana, pinyin/hanzi, inglês), montar a frase com blocos e falar (reconhecimento de voz, no Chrome).
 - **Dicas**: todo exercício tem um botão 💡 Dica. Na múltipla escolha, tira duas alternativas erradas e dá uma pista; no digitar, mostra a primeira letra de cada palavra e depois a resposta; no montar, coloca o próximo bloco certo; no ouvir e no falar, toca devagar. A dica também dá acesso à explicação de gramática da unidade. Dica não conta como erro.
 - **Revisão espaçada**: tudo que você aprende volta para revisão em 1, 2, 4, 7, 14, 30, 60 e 120 dias. Errou, volta para amanhã.
-- **Ajustes**: esconder kana/romaji/pinyin nos exercícios; ligar ou desligar os exercícios de fala.
+- **Ajustes**: esconder kana/romaji/pinyin nos exercícios; ligar ou desligar os exercícios de fala; escolher a voz de cada língua (a automática evita as vozes robóticas e de brincadeira do iPhone e do Mac).
 - No teclado: 1–4 respondem, ? pede dica, Enter avança.
 
 ## Onde editar o conteúdo

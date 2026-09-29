@@ -1,43 +1,28 @@
-# Curso Trilíngue 365
+# Trilha Trilíngue
 
-Site pessoal do curso de 365 dias: inglês, japonês, chinês e espanhol, com cada palavra nova entrando nas quatro línguas ao mesmo tempo.
+Inglês, japonês e chinês dos fundamentos ao C1, **uma palavra de cada vez**, com revisão espaçada.
 
-## O que tem no site
+## Como funciona
 
-- **Hoje**: o dia do curso calculado a partir da data de início, a quadra do dia com pronúncia (toque na palavra), o plano de blocos nos modos Núcleo (3 h) e Turbo (6 h), check de cada bloco e o mapa dos 365 dias.
-- **Método**: metas, as 4 pontes entre as línguas, armadilhas, dia-padrão, Anki, materiais e checkpoints.
-- **52 semanas**: o plano do ano, com filtro por trimestre e a semana atual destacada.
-- **Mês 1**: os 30 primeiros dias, dia a dia.
-- **Vocabulário**: os 100 conceitos do mês 1, busca, modo treino e botão que baixa o CSV pronto para o Anki.
-
-O progresso fica no `localStorage` do navegador. Para usar em mais de um aparelho, use **Exportar progresso** num e **Importar progresso** no outro (em Hoje, Ajustes e backup).
-
-## Colocar no ar (GitHub + Vercel, sem terminal)
-
-1. Entre em [github.com/new](https://github.com/new), dono `viniyokoyamac`, nome `curso-trilingue`, e crie o repositório.
-2. Na página do repositório vazio, clique em **uploading an existing file**, arraste todos os arquivos desta pasta (não a pasta nem o zip) e clique em **Commit changes**.
-3. Entre em [vercel.com/new](https://vercel.com/new), escolha **Import Git Repository**, selecione `curso-trilingue`, deixe o preset **Other** e clique em **Deploy**.
-4. Pronto: o site fica em algo como `curso-trilingue.vercel.app`. Todo commit novo no GitHub publica sozinho.
-
-## Com terminal
-
-```bash
-cd curso-trilingue
-git init && git add . && git commit -m "Curso Trilíngue 365"
-gh repo create viniyokoyamac/curso-trilingue --public --source=. --push
-npx vercel --prod
-```
+- **Sem login**: o progresso fica salvo no navegador deste aparelho.
+- **Uma língua por vez**: escolha Inglês, Japonês ou Chinês no topo. Cada língua tem o seu progresso.
+- **Escolha o nível**: todos os níveis ficam abertos; escolha o seu nos botões acima da trilha. Dentro de cada nível, as unidades seguem em ordem.
+- **Níveis** (CEFR): Fundamentos → A1 → A2 → B1 → B2 → C1. No japonês o C1 equivale mais ou menos ao JLPT N2; no chinês, ao HSK 5.
+  - Fundamentos são próprios de cada língua: hiragana e katakana (japonês), tons e pinyin (chinês), sons difíceis (inglês).
+  - Do A1 ao C1: vocabulário por tema e unidades de gramática com frases completas.
+- **Cada unidade**: explicação de gramática da língua escolhida → item 1 e seus exercícios → item 2 e seus exercícios → … → todos juntos, em duas rodadas.
+- **Exercícios**: significado, escolher a tradução, ouvir, digitar (romaji/kana, pinyin/hanzi, inglês), montar a frase com blocos e falar (reconhecimento de voz, no Chrome).
+- **Revisão espaçada**: tudo que você aprende volta para revisão em 1, 2, 4, 7, 14, 30, 60 e 120 dias. Errou, volta para amanhã.
+- **Ajustes**: esconder kana/romaji/pinyin nos exercícios; ligar ou desligar os exercícios de fala.
+- No teclado: 1–4 respondem, Enter avança.
 
 ## Onde editar o conteúdo
 
 | Arquivo | Conteúdo |
 | --- | --- |
-| `data-metodo.js` | Texto da aba Método, em markdown |
-| `data-plano.js` | As 52 semanas, os trimestres e os 30 dias do mês 1 |
-| `data-vocab.js` | Os conceitos da quadra; novas semanas entram aqui |
-| `data-licoes.js` | A teoria de cada dia: explicação e exemplos por língua |
-| `data-quiz.js` | As questões de múltipla escolha de cada dia (a primeira opção é a certa) |
-| `app.js` | Lógica do site |
+| `data-fundamentos.js` | Kana, tons, sons do inglês. No topo, a descrição do formato dos dados |
+| `data-a1.js` … `data-c1.js` | Um arquivo por nível: unidades, itens e notas de gramática por língua |
+| `app.js` | Trilha, aulas, exercícios e revisão espaçada |
 | `styles.css` | Visual |
 
-Site estático: sem build, sem dependências.
+Site estático: sem build, sem dependências. Publicado pela Vercel a cada commit.
